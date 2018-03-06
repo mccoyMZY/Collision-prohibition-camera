@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+
+	<head>
+		<title>myCity</title>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+		<style>
+			body {
+				font-family: Monospace;
+				background-color: #f0f0f0;
+				margin: 0px;
+				overflow: hidden;
+			}
+		</style>
+	</head>
+
+	<body onload="init()">
+
+		<script src="../js/three.js"></script>
+		<script src="../js/stats.min.js"></script>
+		<script src="FirstPersonControls(1).js"></script>
+
+		<script>
+			let scene, camera, renderer, stats, controls, clock;
+			let canvas = generateTexture();
+			let textureLoader = new THREE.TextureLoader();
+			let templocation = {};
+			let citySize = 1000;
+			let buildingNum = 200;
+			let buildingSize = 100;
+			let SCREEN_WIDTH = window.innerWidth;
+			let SCREEN_HEIGHT = window.innerHeight;
+			let cube = null;
+			let city = null;
+			let Objects = new Array();
+
+			function init() {
+				initScene();
+				initCamera();
+				initRenderer();
+				initCity()
+				initStats();
+				animate();
+			}
+
+			function initScene() {
+				scene = new THREE.Scene();
+				scene.background = new THREE.Color(0xffffff);
+			}
+
+			function initCamera() {
+				camera = new THREE.PerspectiveCamera(60, SCREEN_WIDTH / SCREEN_HEIGHT, 1, 10000);
+				camera.position.z = 200;
+				camera.position.y = 10;
+				controls = new THREE.FirstPersonControls(camera);
+				controls.movementSpeed = 300;
+				controls.lookSpeed = 0.125;
+				controls.lookVertical = true;
+				clock = new THREE.Clock();
+
+			}
+
+			function initRenderer() {
+				renderer = new THREE.WebGLRenderer();
+				renderer.setSize(SCREEN_WIDTH, SCREEN_HEIGHT);
+				document.body.appendChild(renderer.domElement);
+			}
+
+			function initStats() {
+				stats = new Stats();
+				document.body.appendChild(stats.dom);
+			}
+
+			function initLight() {
+				let light = new THREE.HemisphereLight(0xfffff0, 0x101020, 1.25);
+				light.position.set(0.75, 1, 0.25);
+				scene.add(light);
+			}
+
+			function collision(collisionArray, Movingcube) {
+				var offset = new THREE.Vector3(); //获取到底部cube的中心点坐标
+				var originPoint = Movingcube.position.clone();
+				for(var vertexIndex = 0; vertexIndex < Movingcube.geometry.vertices.length; vertexIndex++) {
+					//顶点原始坐标
+					var localVertex = Movingcube.geometry.vertices[vertexIndex].clone();
+					//顶点经过变换后的坐标
+					var globaVertex = localVertex.applyMatrix4(Movingcube.matrix);
+					//获得由中心指向顶点的向量
+					var directionVector = globaVertex.sub(Movingcube.position);
+
+					//将方向向量初始化
+					var ray = new THREE.Raycaster(originPoint, directionVector.clone().normalize());
+					// console.log(ray)
+
+					//检测射线与多个物体相交的情况
+					var collisionResults = ray.intersectObjects(collisionArray, true);
+
+					//检测射线与一个物体相交的情况
+					//         		 var collisionResults = ray.intersectObject(collisionArray, true);
+
+					//如果返回结果不为空，且交点与射线起点的距离小于物体中心至顶点的距离，则发生碰撞
+					if(collisionResults.length > 0 && collisionResults[0].distance < directionVector.length() + 1.2) {
+
+						return true;
+					}
+				}
+				return false;
+			}
+
+			function initCity() {
+				scene.add(createGround());
+				let material = new THREE.MeshBasicMaterial();
+
+				var texture = new THREE.Texture(generateTexture());
+				texture.anisotropy = 4;
+				texture.needsUpdate = true;
+				material.map = texture;
+
+				let geometry = new THREE.BoxGeometry();
+				city = createBuilding(300, 300, 300, 5)
+				scene.add(city);
+				Objects.push(city);
+				scene.background = new THREE.Color(0xf0f0f0);
+
+				cube0 = new THREE.Mesh(new THREE.BoxGeometry(220, 220, 220), new THREE.MeshBasicMaterial({
+					color: 0xff0000
+				}))
+				cube0.position.x = 500;
+				cube0.position.y = 0;
+				cube0.position.z = 500;
+				scene.add(cube0);
+				Objects.push(cube0);
+				cube1 = new THREE.Mesh(new THREE.BoxGeometry(220, 220, 220), new THREE.MeshBasicMaterial({
+					color: 0xf0f000
+				}))
+				cube1.position.x = 500;
+				cube1.position.y = 0;
+				cube1.position.z = 900;
+				scene.add(cube1);
+				Objects.push(cube1);
+				cube = new THREE.Mesh(new THREE.BoxGeometry(20, 20, 20), new THREE.MeshBasicMaterial({
+					color: 0xff0000
+				}))
+				cube.position.x = camera.position.x;
+				cube.position.y = camera.position.y;
+				cube.position.z = camera.position.z;
+				scene.add(cube);
+			}
+
+			function createGround() {
+				let geometry = new THREE.PlaneGeometry(10000, 10000);
+				let material = new THREE.MeshBasicMaterial({
+					color: 0xaaaaaa
+				});
+				let ground = new THREE.Mesh(geometry, material);
+				ground.castShadow = true;
+				ground.rotation.x = -Math.PI / 2;
+				return ground;
+			}
+			let bs = []
+
+			function createBuilding(x, y, z, h) {
+				let material = new THREE.MeshBasicMaterial({
+					overdraw: 0.5
+				});
+				let geometry = new THREE.CubeGeometry(buildingSize * Math.random() * 2 + 50, buildingSize, buildingSize * Math.random() * 2 + 50);
+				geometry.faces.splice(6, 2);
+
+				var texture = new THREE.Texture(generateTexture());
+				texture.anisotropy = 4;
+				texture.needsUpdate = true;
+				material.map = texture;
+
+				let building = new THREE.Mesh(geometry, material);
+				//building.rotation.y=Math.PI*Math.random();
+				building.position.x = x;
+				building.position.y = h * buildingSize / 2
+				building.position.z = z;
+				building.scale.y = h
+				building.updateMatrix();
+				bs.push(building)
+				return building;
+			}
+
+			function generateTexture() {
+				// build a small canvas 32x64 and paint it in white
+				var canvas = document.createElement('canvas');
+				canvas.width = 32;
+				canvas.height = 64;
+				var context = canvas.getContext('2d');
+				// plain it in white
+				context.fillStyle = '#cccccc'
+				context.fillRect(0, 0, 32, 64);
+				// draw the window rows - with a small noise to simulate light variations in each room
+				for(var y = 2; y < 64; y += 2) {
+					for(var x = 0; x < 32; x += 2) {
+						var value = Math.floor(Math.random() * 64);
+						context.fillStyle = 'rgb(' + [value, value, value].join(',') + ')';
+						context.fillRect(x, y, 2, 1);
+					}
+				}
+
+				// build a bigger canvas and copy the small one in it
+				// This is a trick to upscale the texture without filtering
+				var canvas2 = document.createElement('canvas');
+				canvas2.width = 512;
+				canvas2.height = 1024;
+				var context = canvas2.getContext('2d');
+				// disable smoothing
+				context.imageSmoothingEnabled = false;
+				context.webkitImageSmoothingEnabled = false;
+				context.mozImageSmoothingEnabled = false;
+				// then draw the image
+				context.drawImage(canvas, 0, 0, canvas2.width, canvas2.height);
+				// return the just built canvas2
+				return canvas2;
+			}
+
+			//			function render(){
+			//					controls.update( clock.getDelta() );
+			//					cube.position.x=camera.position.x;
+			//					cube.position.y=camera.position.y;
+			//					cube.position.z=camera.position.z;
+			//					controls.moveEnabled=true;
+			//					if(collision(city, cube)){
+			//						camera.position.x -=0.5; 
+			//						camera.position.z -=0.5;  
+			//						controls.moveEnabled=false; 
+			//					}
+			//				renderer.render( scene, camera );
+			//			}
+
+			function render() {
+				if(controls.moveEnabled) {
+					templocation.x = camera.position.x;
+					templocation.y = camera.position.y;
+					templocation.z = camera.position.z;
+				}
+				controls.update(clock.getDelta());
+				cube.position.x = camera.position.x;
+				cube.position.y = camera.position.y;
+				cube.position.z = camera.position.z;
+				if(collision(Objects, cube)) {
+					camera.position.x = templocation.x;
+					camera.position.y = templocation.y;
+					camera.position.z = templocation.z;
+
+				}
+				renderer.render(scene, camera);
+			}
+
+			function animate() {
+				requestAnimationFrame(animate);
+				stats.begin();
+				render();
+				stats.end();
+			}
+		</script>
+
+	</body>
+
+</html>
